@@ -118,6 +118,10 @@ impl RuntimeCore {
             self.kbd.focus_step = Some(back);
             self.commit.dirty = true;
         }
+        if let Some(from) = tx.focus_step_from.take() {
+            self.kbd.focus_step_from = Some(from);
+            self.commit.dirty = true;
+        }
         if let Some(title) = tx.title.take() { self.host.window_title.set(title); }
         if let Some((text, how)) = tx.announce.take() { self.host.announcement.say(text, how); }
         if let Some(mut request) = tx.window_frame.take() {

@@ -456,11 +456,16 @@ impl RuntimeCore {
         // control that is closing (a menu, a popover) can hand focus to its neighbour without
         // its unmount first restoring the trigger. An explicit focus request wins.
         let step = self.kbd.focus_step.take();
-        if self.kbd.focus_request.is_none()
-            && let Some(back) = step
-            && let Some(request) = self.focus_step_request(back)
-        {
-            self.kbd.focus_request = Some(request);
+        let step_from = self.kbd.focus_step_from.take();
+        let stale = matches!(self.kbd.focus_request.as_ref().map(|(.., ask)| *ask), None | Some(crate::el::FocusAsk::WhenShown));
+        if stale {
+            let request = step_from
+                .as_ref()
+                .and_then(|(anchor, back)| self.focus_step_request_from(anchor, *back))
+                .or_else(|| step.and_then(|back| self.focus_step_request(back)));
+            if let Some(request) = request {
+                self.kbd.focus_request = Some(request);
+            }
         }
         // A `Tx::focus_when_shown` still owed stands until the user's own input or another ask,
         // whatever focus did meanwhile (a closing palette leaves it nowhere, then on the prompt).
@@ -681,6 +686,22 @@ impl RuntimeCore {
     }
     /// The key one Tab stop away from the focused element in the old tree, as `Tx::focus_step`
     /// asks. The target is a key so it survives the rebuild that follows the handler.
+    fn focus_step_request_from(&self, anchor: &str, back: bool) -> Option<(String, bool, crate::el::FocusAsk)> {
+        let order = self.tab_order();
+        if order.is_empty() {
+            return None;
+        }
+        let at = self.tree.nodes.iter().position(|n| n.key.as_deref() == Some(anchor))?;
+        let next = match order.iter().position(|&i| i == at) {
+            Some(i) if back => (i + order.len() - 1) % order.len(),
+            Some(i) => (i + 1) % order.len(),
+            None if back => order.iter().rposition(|&j| j < at).unwrap_or(order.len() - 1),
+            None => order.iter().position(|&j| j > at).unwrap_or(0),
+        };
+        let key = self.tree.nodes[order[next]].key.clone()?;
+        Some((key, true, crate::el::FocusAsk::Focus))
+    }
+
     fn focus_step_request(&self, back: bool) -> Option<(String, bool, crate::el::FocusAsk)> {
         let order = self.tab_order();
         if order.is_empty() {

@@ -104,6 +104,7 @@ pub struct Tx {
     pub(crate) focus_to: Option<(String, bool, FocusAsk)>,
     /// `Tx::focus_step`: move one Tab stop in the tree this change replaces.
     pub(crate) focus_step: Option<bool>,
+    pub(crate) focus_step_from: Option<(String, bool)>,
     /// `Tx::focus_visible`.
     pub(crate) focus_visible: bool,
     /// `Tx::assistive_technology`.
@@ -517,6 +518,15 @@ impl Tx {
     /// by key in the new tree. An explicit [`Self::focus`] in the same change wins.
     pub fn focus_step(&mut self, back: bool) {
         self.focus_step = Some(back);
+    }
+
+    /// [`Tx::focus_step`] relative to a named control instead of the focused one: a menu
+    /// closes and hands focus to the neighbour of the trigger it was anchored to, even
+    /// though focus is on one of the menu's rows. The anchor is looked up in the tree the
+    /// handler replaces, so the trigger may already be out of the Tab order (a combobox
+    /// hides its trigger while open).
+    pub fn focus_step_from(&mut self, anchor: impl Into<String>, back: bool) {
+        self.focus_step_from = Some((anchor.into(), back));
     }
 
     /// [`Tx::focus`] for an element that may not be shown yet: content still loading, a card that

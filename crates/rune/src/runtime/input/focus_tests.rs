@@ -1002,3 +1002,34 @@ fn focus_step_uses_the_old_tab_order_past_a_closing_control() {
     assert_eq!(focused(&rt), "before", "Shift+Tab must step past the closed menu in one press");
     assert!(!rt.state.open);
 }
+
+#[test]
+fn focus_step_from_uses_the_anchor_past_a_closing_control() {
+    fn view(s: &StepState, _: &mut Cx<StepState>) -> El {
+        let mut root = col().key("root").size(200.0, 200.0)
+            .child(button("before"))
+            .child(button("trigger").tab_index(if s.open { -1 } else { 0 }));
+        if s.open {
+            root = root.child(col().key("menu").child(button("row"))
+                .on_key(|s: &mut StepState, ev: &KeyEvent, tx: &mut Tx| {
+                    if ev.key == Key::Tab && ev.mods.shift {
+                        s.open = false;
+                        tx.focus_step_from("trigger", true);
+                        true
+                    } else {
+                        false
+                    }
+                }));
+        }
+        root.child(button("after"))
+    }
+    let mut rt = Runtime::new(StepState::default(), view, (200.0, 200.0), Env::new(true, 1.0));
+    rt.frame(0.0);
+    rt.update(|s, tx| { s.open = true; tx.focus("row", false); });
+    rt.frame(0.0);
+    assert_eq!(focused(&rt), "row");
+    rt.key(KeyEvent { key: Key::Tab, mods: Mods { shift: true, ..Default::default() } });
+    rt.frame(0.0);
+    assert_eq!(focused(&rt), "before", "the anchor's previous Tab stop is the before control");
+    assert!(!rt.state.open);
+}

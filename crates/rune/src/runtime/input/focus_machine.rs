@@ -271,6 +271,8 @@ pub(crate) struct KeyboardState {
     pub(in crate::runtime) focus_request: Option<(String, bool, crate::el::FocusAsk)>,
     /// `Tx::focus_step`: move one Tab stop in the old tree (`true` is backward).
     pub(in crate::runtime) focus_step: Option<bool>,
+    /// `Tx::focus_step_from`: the same, anchored on a named control instead of the focused one.
+    pub(in crate::runtime) focus_step_from: Option<(String, bool)>,
     /// `Tx::focus_when_shown` still waiting for its element: the key and whether its ring shows.
     pub(in crate::runtime) focus_owed: Option<(String, bool)>,
     /// Focused text fields that unmounted without being blurred: while another field holds focus,
@@ -312,6 +314,7 @@ impl KeyboardState {
             focus_before_commit: None,
             focus_request: None,
             focus_step: None,
+            focus_step_from: None,
             focus_owed: None,
             focus_returned: false,
             unmounted_focused: Vec::new(),
