@@ -375,38 +375,41 @@ impl RuntimeCore {
                             .map(|g| zoom_glyph(g, pl_origin, pl_r_origin, tk / raster)));
                     }
                 }
-                if e.focused && !departing {
+                if !departing {
                     let (a, b) = e.range();
+                    // A browser keeps a field's selection after focus leaves it, painted in the
+                    // inactive pair; only the caret and composition belong to the focused field.
                     if a != b && e.preedit().is_none() {
                         let (da, db) = e.display_selection_range(a, b);
-                        // An inactive window paints a field's selection in its inactive pair, as a browser does.
                         let (highlight, ink) = inp.selection_style.map_or((inp.selection, None), |st| st.pick(self.host.window_focused != Some(false)));
                         selectable::push_field_selection(&mut self.instances, flow, da.max(shown_a), db.min(shown_b),
                             origin, tk, premul(highlight, o, srgb), s, clip, fade);
                         selected_ink = ink.map(|c| (da, db, premul(c, o, srgb)));
                     }
-                    // A range selection hides the caret, as a browser's field and a native one do.
-                    if a == b || e.is_composing() {
-                        caret = input_caret;
-                    }
-                    // The composition's underline: thin under what's composed, thick under the
-                    // clause being converted, each clause a point short at both ends so clauses
-                    // read apart, as Chromium draws them (`CompositionMarkerPainter`).
-                    if e.preedit().is_some() {
-                        let pa = e.range().0;
-                        for clause in e.preedit_clauses() {
-                            let (a, b, thick) = (pa + clause.range().start, pa + clause.range().end, if clause.is_target() { 2.0 } else { 1.0 });
-                            for (bb, _) in flow.range_boxes(a, b, false) {
-                                let (x0, x1) = (origin[0] + bb.x0 as f32 * tk, origin[0] + bb.x1 as f32 * tk);
-                                let inset = if x1 - x0 > 4.0 * s { s } else { 0.0 };
-                                let h = thick * s;
-                                self.instances.push(rect_inst(
-                                    [x0 + inset, origin[1] + bb.y1 as f32 * tk - h, x1 - x0 - 2.0 * inset, h],
-                                    premul(color, o, srgb),
-                                    0.0,
-                                    clip,
-                                    fade,
-                                ));
+                    if e.focused {
+                        // A range selection hides the caret, as a browser's field and a native one do.
+                        if a == b || e.is_composing() {
+                            caret = input_caret;
+                        }
+                        // The composition's underline: thin under what's composed, thick under the
+                        // clause being converted, each clause a point short at both ends so clauses
+                        // read apart, as Chromium draws them (`CompositionMarkerPainter`).
+                        if e.preedit().is_some() {
+                            let pa = e.range().0;
+                            for clause in e.preedit_clauses() {
+                                let (a, b, thick) = (pa + clause.range().start, pa + clause.range().end, if clause.is_target() { 2.0 } else { 1.0 });
+                                for (bb, _) in flow.range_boxes(a, b, false) {
+                                    let (x0, x1) = (origin[0] + bb.x0 as f32 * tk, origin[0] + bb.x1 as f32 * tk);
+                                    let inset = if x1 - x0 > 4.0 * s { s } else { 0.0 };
+                                    let h = thick * s;
+                                    self.instances.push(rect_inst(
+                                        [x0 + inset, origin[1] + bb.y1 as f32 * tk - h, x1 - x0 - 2.0 * inset, h],
+                                        premul(color, o, srgb),
+                                        0.0,
+                                        clip,
+                                        fade,
+                                    ));
+                                }
                             }
                         }
                     }

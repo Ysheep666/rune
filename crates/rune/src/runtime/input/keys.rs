@@ -66,6 +66,11 @@ impl RuntimeCore {
             _ => !ev.is_command_chord() || ev.control_binding().is_some(),
         };
         if input_handles {
+            // A read-only field still moves, selects and copies, but edits nothing: typing,
+            // deletion, Return, cut/paste and undo stop here before they reach the editor.
+            if self.focused_input().is_some_and(|i| i.read_only) && !read_only_keeps_key(ev) {
+                return true;
+            }
             let layout = self.focused_layout();
             // A rich field copies its selection's formatting too, read before a cut removes it.
             let mut html = None;
@@ -349,7 +354,7 @@ impl RuntimeCore {
         self.paste_target().is_some() || self.app_paste_handler().is_some()
     }
     pub(crate) fn paste_target(&self) -> Option<String> {
-        self.focused_input().filter(|i| i.access.is_some()).and(self.kbd.focus.owned())
+        self.focused_input().filter(|i| i.access.is_some() && !i.read_only).and(self.kbd.focus.owned())
     }
     /// What the paste target hears: every form, images too, for a field with
     /// `on_input_paste` or a root `on_paste_content` handler; text, HTML and RTF for a rich
@@ -393,4 +398,15 @@ impl RuntimeCore {
     pub fn has_focus(&self) -> bool {
         self.kbd.has_focus()
     }
+}
+
+
+/// Keys a read-only field still handles: moving the caret, extending a selection, and copying
+/// it. Every other key an input would handle is an edit and is consumed instead.
+fn read_only_keeps_key(ev: &KeyEvent) -> bool {
+    use crate::Key::*;
+    matches!(
+        ev.key,
+        Left | Right | Up | Down | Home | End | PageUp | PageDown | Tab | Escape | Command('a' | 'c')
+    )
 }

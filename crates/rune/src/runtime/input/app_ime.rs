@@ -55,6 +55,14 @@ impl RuntimeCore {
     /// composition the app has open ends there even after a field took focus, and the input
     /// method turning on or off is only the app's to hear.
     pub(in crate::runtime) fn run_ime(&mut self, app: &mut dyn AppDriver, ev: Ime, one: &mut Tx) -> bool {
+        // A read-only field never takes a composition. Enabled/Disabled still belong to the app,
+        // and a composition the app already owns ends in the app.
+        if !self.app_ime_composing(app)
+            && matches!(ev, Ime::Preedit(..) | Ime::Commit(..))
+            && self.focused_input().is_some_and(|i| i.read_only)
+        {
+            return true;
+        }
         let app_target = self.app_ime_composing(app) || matches!(ev, Ime::Enabled | Ime::Disabled) || self.focused_input().is_none();
         let active = self.composing(app) || matches!(&ev, Ime::Preedit(s, ..) | Ime::Commit(s) if !s.is_empty());
         let ran = if app_target { self.app_ime_event(app, &ev, one) } else { self.with_focused(app, |e| e.ime(&ev), one) };
@@ -76,7 +84,7 @@ impl RuntimeCore {
     /// The focused field's composition becomes its text, its change handler hearing it, before
     /// focus or the caret moves away from it.
     pub(in crate::runtime) fn finish_field_composition(&mut self, app: &mut dyn AppDriver, one: &mut Tx) -> bool {
-        if !self.focused_input().is_some_and(|i| i.access.is_some()) || !self.composing(app) { return false; }
+        if !self.focused_input().is_some_and(|i| i.access.is_some() && !i.read_only) || !self.composing(app) { return false; }
         let mut finished = false;
         self.with_focused(app, |e| { finished = e.finish_composition(); EditOutcome::default() }, one);
         if finished { self.edit.ime_reset = true; }

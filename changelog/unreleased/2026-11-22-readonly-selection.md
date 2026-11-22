@@ -1,0 +1,1 @@
+- A read-only text field now rejects edits, paste and IME commits before they reach its model, while still moving its caret, selecting and copying. A field's selection also stays painted in the inactive pair after focus or the window leaves it, as a browser does.

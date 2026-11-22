@@ -16,6 +16,9 @@ pub struct InputSpec {
     pub selection: Color,
     /// One unwrapped line that scrolls sideways to keep the caret visible, like `<input>`.
     pub single_line: bool,
+    /// ARIA `aria-readonly`: the value can be read and selected but not changed. The runtime
+    /// rejects edits, paste and IME commits before they reach the model.
+    pub read_only: bool,
     /// `placeholder_color`, and `caret` with `selection`, came from [`El::placeholder`] and
     /// [`El::caret`]; the others follow the window's foreground ([`Cx::foreground`](crate::Cx::foreground)).
     pub(crate) placeholder_inked: bool,
@@ -80,6 +83,7 @@ pub fn text_input(edit: &TextEdit, style: TextStyle) -> El {
         caret: Color::WHITE,
         selection: DEFAULT_SELECTION,
         single_line: false,
+        read_only: false,
         placeholder_inked: false,
         caret_inked: false,
         revealed_override: None,

@@ -499,6 +499,7 @@ impl RuntimeCore {
             Action::FinishIme => self.finish_ime(app, &mut one),
             Action::Paste(content, target) => {
                 if target.is_some_and(|target| target != self.paste_target()) { return false; }
+                let read_only = self.focused_input().is_some_and(|i| i.read_only);
                 let hook = self.focused_input().and_then(|i| i.paste.clone());
                 let own_pills = if cfg!(not(target_arch = "wasm32")) || self.edit.has_clipboard() {
                     content.has_own_pills()
@@ -516,7 +517,7 @@ impl RuntimeCore {
                     if !content.has_plain() { return EditOutcome::default(); }
                     edit.paste(content.text())
                 };
-                if self.with_focused_state(app, into_field, &mut one) {
+                if !read_only && self.with_focused_state(app, into_field, &mut one) {
                     log_event!(self, "paste field");
                     true
                 } else if let Some(f) = self.app_paste_handler() && (f.call)(app.states(), &content, &mut one) {

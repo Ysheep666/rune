@@ -165,6 +165,9 @@ impl El {
     /// checklist shown in a finished document.
     pub fn read_only(mut self, read_only: bool) -> Self {
         self.cold_mut().a11y.more().read_only = read_only;
+        if let Some(input) = self.cold_mut().input.as_deref_mut() {
+            input.read_only = read_only;
+        }
         self
     }
     /// How a column header sorts its table: `Some(true)` ascending, `Some(false)` descending
