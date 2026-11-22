@@ -224,7 +224,19 @@ impl RuntimeCore {
         // A press cancels the waits to report an enter; the next move after it starts them again.
         self.pointer.press_hover_delays();
         self.pointer.hover_paused = true;
-        let target = self.primary_target(x, y);
+        let mut target = self.primary_target(x, y);
+        // A press-through layer (a menu scrim) closes on its own handler and then behaves as
+        // if it weren't under the pointer: the target beneath it gets the press and focus.
+        if let Some(layer) = target
+            && self.tree.nodes[layer].focus.through
+            && self.tree.nodes[layer].handlers.modal.is_none()
+            && let Some(below) = self.primary_target_below(layer, x, y)
+        {
+            if self.tree.nodes[layer].handlers.on_press.is_some() {
+                self.frame.queue.push(Action::Press(self.tree.nodes[layer].path.clone(), crate::PointerButton::Primary, false));
+            }
+            target = Some(below);
+        }
         if target.and_then(|t| self.textbox_input(t)).is_none() {
             self.edit.input_click.clear();
         }

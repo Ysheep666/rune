@@ -1033,3 +1033,30 @@ fn focus_step_from_uses_the_anchor_past_a_closing_control() {
     assert_eq!(focused(&rt), "before", "the anchor's previous Tab stop is the before control");
     assert!(!rt.state.open);
 }
+
+#[derive(Default)]
+struct ThroughState { open: bool, presses: usize }
+
+#[test]
+fn press_through_closes_the_layer_and_activates_what_is_below() {
+    fn view(s: &ThroughState, _: &mut Cx<ThroughState>) -> El {
+        let mut root = col().key("root").size(200.0, 200.0)
+            .child(button("under").on_press(|s: &mut ThroughState| s.presses += 1));
+        if s.open {
+            root = root.child(el().key("scrim").absolute(0.0, 0.0).size(200.0, 200.0)
+                .on_background_press(|s: &mut ThroughState| s.open = false)
+                .press_through());
+        }
+        root
+    }
+    let mut rt = Runtime::new(ThroughState { open: true, presses: 0 }, view, (200.0, 200.0), Env::new(true, 1.0));
+    rt.frame(0.0);
+    let (x, y) = rt.find("under").unwrap();
+    rt.pointer_down(x, y);
+    rt.frame(0.0);
+    assert!(!rt.state.open, "the scrim's own handler must run first");
+    assert_eq!(focused(&rt), "under", "the press must focus what the scrim covers");
+    rt.pointer_up(x, y);
+    rt.frame(0.0);
+    assert_eq!(rt.state.presses, 1, "one click must activate the covered control");
+}

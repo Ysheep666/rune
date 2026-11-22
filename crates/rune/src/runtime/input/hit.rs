@@ -299,11 +299,26 @@ impl RuntimeCore {
         self.hit.find_hit(|id, r| {
             if !self.hit_contains(id, r, x, y) { return None; }
             let i = *self.tree.node_index.get(&id)?;
-            let n = &self.tree.nodes[i];
-            // A secondary-only child must not obscure primary input or background blur.
-            (!self.subtree_exiting(i) && self.allowed(i) && (n.has_primary_handler() || n.input.is_some() || n.role == "textbox"
-                || (n.role == "button" && n.vis_flags.hit()) || n.window_drag != crate::el::WindowDrag::None || n.focus.enabled || n.handlers.modal.is_some()
-                || self.is_selectable(i))).then_some(i)
+            self.takes_primary(i).then_some(i)
+        })
+    }
+
+    /// Whether `i` would be a primary target where hit testing found it.
+    fn takes_primary(&self, i: usize) -> bool {
+        let n = &self.tree.nodes[i];
+        // A secondary-only child must not obscure primary input or background blur.
+        !self.subtree_exiting(i) && self.allowed(i) && (n.has_primary_handler() || n.input.is_some() || n.role == "textbox"
+            || (n.role == "button" && n.vis_flags.hit()) || n.window_drag != crate::el::WindowDrag::None || n.focus.enabled || n.handlers.modal.is_some()
+            || self.is_selectable(i))
+    }
+
+    /// The topmost primary target under (x, y) outside the subtree rooted at `layer`.
+    fn top_target_below(&self, layer: usize, x: f32, y: f32) -> Option<usize> {
+        let in_layer = |i: usize| std::iter::successors(Some(i), |&p| self.tree.nodes[p].parent).any(|p| p == layer);
+        self.hit.find_hit(|id, r| {
+            if !self.hit_contains(id, r, x, y) { return None; }
+            let i = *self.tree.node_index.get(&id)?;
+            (!in_layer(i) && self.takes_primary(i)).then_some(i)
         })
     }
 
@@ -313,6 +328,17 @@ impl RuntimeCore {
     /// (`selectable_at`).
     pub(in crate::runtime) fn primary_target(&self, x: f32, y: f32) -> Option<usize> {
         let i = self.top_target(x, y)?;
+        self.primary_target_from(i, x, y)
+    }
+
+    /// The primary target a press through `layer` reaches: the topmost target outside that
+    /// layer's subtree, resolved the same way as a normal press.
+    pub(in crate::runtime) fn primary_target_below(&self, layer: usize, x: f32, y: f32) -> Option<usize> {
+        let i = self.top_target_below(layer, x, y)?;
+        self.primary_target_from(i, x, y)
+    }
+
+    fn primary_target_from(&self, i: usize, x: f32, y: f32) -> Option<usize> {
         let n = &self.tree.nodes[i];
         if !self.is_selectable(i) || n.has_primary_handler() || self.link_at(i, x, y).is_some() { return Some(i); }
         let handles = |n: &Node| n.has_primary_handler() || n.focus.enabled;

@@ -41,6 +41,8 @@ pub(crate) struct FocusSpec {
     pub return_to: Option<String>,
     /// [`crate::El::press_focuses_below`].
     pub below: bool,
+    /// [`crate::El::press_through`].
+    pub through: bool,
     /// `on_step`: a slider's arrow and page keys.
     pub step: Option<StepFn>,
     /// `on_step_limit`: a slider's Home and End.
@@ -74,6 +76,7 @@ impl crate::cold::Empty for FocusSpec {
         follows: false,
         return_to: None,
         below: false,
+        through: false,
         step: None,
         step_limit: None,
         key_up: None,
@@ -213,6 +216,15 @@ impl El {
     /// outside a menu focuses the `tabIndex` scroller it lands on, else nothing.
     pub fn press_focuses_below(mut self) -> Self {
         self.cold_mut().focus.below = true;
+        self
+    }
+    /// A press on this layer also reaches what is beneath it: the layer's own `on_press`
+    /// runs first (closing a menu), then the press goes to the element a press there would
+    /// hit and focus without the layer. Unlike [`El::press_focuses_below`], this is not
+    /// limited to scroll regions: a click outside a searchable popup can activate the control
+    /// under it in one gesture, as a web page's outside click does.
+    pub fn press_through(mut self) -> Self {
+        self.cold_mut().focus.through = true;
         self
     }
     /// The control a [`El::modal`] focuses when it opens, as HTML's `autofocus` attribute in a
