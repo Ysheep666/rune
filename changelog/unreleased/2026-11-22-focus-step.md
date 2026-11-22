@@ -1,0 +1,1 @@
+- `Tx::focus_step` moves focus to the adjacent Tab stop of the tree a handler replaces, resolved by key after the commit. A menu or popover can close and hand focus past its trigger in one Tab or Shift+Tab instead of the unmount restoring the trigger first.

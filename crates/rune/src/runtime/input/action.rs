@@ -241,6 +241,7 @@ pub(crate) fn merge(tx: &mut Tx, one: Tx) {
     if one.rewind.is_some() { tx.rewind = one.rewind; }
     tx.blur |= one.blur;
     if one.focus_to.is_some() { tx.focus_to = one.focus_to; }
+    if one.focus_step.is_some() { tx.focus_step = one.focus_step; }
     if one.select.is_some() {
         tx.select = one.select;
         tx.select_from_change = one.select_from_change;

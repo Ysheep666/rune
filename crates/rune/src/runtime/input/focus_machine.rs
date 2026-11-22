@@ -269,6 +269,8 @@ pub(crate) struct KeyboardState {
     pub(in crate::runtime) focus_before_commit: Option<String>,
     /// `Tx::focus`: the key the next commit focuses, and whether its ring shows.
     pub(in crate::runtime) focus_request: Option<(String, bool, crate::el::FocusAsk)>,
+    /// `Tx::focus_step`: move one Tab stop in the old tree (`true` is backward).
+    pub(in crate::runtime) focus_step: Option<bool>,
     /// `Tx::focus_when_shown` still waiting for its element: the key and whether its ring shows.
     pub(in crate::runtime) focus_owed: Option<(String, bool)>,
     /// Focused text fields that unmounted without being blurred: while another field holds focus,
@@ -309,6 +311,7 @@ impl KeyboardState {
             modal_focus: crate::runtime::modal_focus::ModalFocus::Closed,
             focus_before_commit: None,
             focus_request: None,
+            focus_step: None,
             focus_owed: None,
             focus_returned: false,
             unmounted_focused: Vec::new(),

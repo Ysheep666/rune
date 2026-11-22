@@ -452,6 +452,16 @@ impl RuntimeCore {
         changed
     }
     pub(in crate::runtime) fn sync_requested_focus(&mut self, app: &mut dyn AppDriver, nodes: &mut Vec<Node>) -> bool {
+        // `Tx::focus_step` is resolved against the Tab order of the tree being replaced, so a
+        // control that is closing (a menu, a popover) can hand focus to its neighbour without
+        // its unmount first restoring the trigger. An explicit focus request wins.
+        let step = self.kbd.focus_step.take();
+        if self.kbd.focus_request.is_none()
+            && let Some(back) = step
+            && let Some(request) = self.focus_step_request(back)
+        {
+            self.kbd.focus_request = Some(request);
+        }
         // A `Tx::focus_when_shown` still owed stands until the user's own input or another ask,
         // whatever focus did meanwhile (a closing palette leaves it nowhere, then on the prompt).
         let owed = self.kbd.focus_owed.take().map(|(key, ring)| (key, ring, crate::el::FocusAsk::WhenShown));
@@ -669,6 +679,27 @@ impl RuntimeCore {
         }
         None
     }
+    /// The key one Tab stop away from the focused element in the old tree, as `Tx::focus_step`
+    /// asks. The target is a key so it survives the rebuild that follows the handler.
+    fn focus_step_request(&self, back: bool) -> Option<(String, bool, crate::el::FocusAsk)> {
+        let order = self.tab_order();
+        if order.is_empty() {
+            return None;
+        }
+        let focused = self.focused_index();
+        let current = order.iter().position(|&i| Some(i) == focused);
+        let next = match (current, focused) {
+            (Some(i), _) if back => (i + order.len() - 1) % order.len(),
+            (Some(i), _) => (i + 1) % order.len(),
+            (None, Some(at)) if back => order.iter().rposition(|&j| j < at).unwrap_or(order.len() - 1),
+            (None, Some(at)) => order.iter().position(|&j| j > at).unwrap_or(0),
+            (None, None) if back => order.len() - 1,
+            (None, None) => 0,
+        };
+        let key = self.tree.nodes[order[next]].key.clone()?;
+        Some((key, true, crate::el::FocusAsk::Focus))
+    }
+
     pub(in crate::runtime) fn tab_order(&self) -> Vec<usize> {
         let all: Vec<_> = (0..self.tree.nodes.len()).filter(|&i| self.can_focus(i) && self.tree.nodes[i].focus.order >= 0).collect();
         let mut order: Vec<_> = all.iter().copied().filter(|&i| {

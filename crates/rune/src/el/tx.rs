@@ -102,6 +102,8 @@ pub struct Tx {
     pub(crate) blur: bool,
     /// `Tx::focus` and `Tx::return_focus`: the key, whether its ring shows, and which asked.
     pub(crate) focus_to: Option<(String, bool, FocusAsk)>,
+    /// `Tx::focus_step`: move one Tab stop in the tree this change replaces.
+    pub(crate) focus_step: Option<bool>,
     /// `Tx::focus_visible`.
     pub(crate) focus_visible: bool,
     /// `Tx::assistive_technology`.
@@ -506,6 +508,15 @@ impl Tx {
     /// in the same change wins over it. Nothing happens when no such element shows.
     pub fn focus(&mut self, key: impl Into<String>, ring: bool) {
         self.focus_to = Some((key.into(), ring, FocusAsk::Focus));
+    }
+
+    /// Move focus one Tab stop in the tree this change replaces, after the change commits:
+    /// `back` is Shift+Tab, otherwise the next stop. Unlike a Tab the runtime handles itself,
+    /// this can run while a control is closing and stop that control's unmount from handing
+    /// focus back to its trigger: the target is resolved from the old Tab order, then applied
+    /// by key in the new tree. An explicit [`Self::focus`] in the same change wins.
+    pub fn focus_step(&mut self, back: bool) {
+        self.focus_step = Some(back);
     }
 
     /// [`Tx::focus`] for an element that may not be shown yet: content still loading, a card that

@@ -968,3 +968,37 @@ fn fallback_in_new_skips_collapsed_zero_size_controls() {
     let picked = rt.core().fallback_in_new(&gone, &rt.tree.nodes);
     assert_eq!(picked.as_deref(), Some(visible.as_str()), "fallback_in_new must skip collapsed zero-size controls");
 }
+
+#[derive(Default)]
+struct StepState { open: bool }
+
+#[test]
+fn focus_step_uses_the_old_tab_order_past_a_closing_control() {
+    fn view(s: &StepState, _: &mut Cx<StepState>) -> El {
+        let mut root = col().key("root").size(200.0, 200.0)
+            .child(button("before"))
+            .child(button("trigger").tab_index(if s.open { -1 } else { 0 }));
+        if s.open {
+            root = root.child(col().key("menu").child(button("row"))
+                .on_key(|s: &mut StepState, ev: &KeyEvent, tx: &mut Tx| {
+                    if ev.key == Key::Tab && ev.mods.shift {
+                        s.open = false;
+                        tx.focus_step(true);
+                        true
+                    } else {
+                        false
+                    }
+                }));
+        }
+        root.child(button("after"))
+    }
+    let mut rt = Runtime::new(StepState::default(), view, (200.0, 200.0), Env::new(true, 1.0));
+    rt.frame(0.0);
+    rt.update(|s, tx| { s.open = true; tx.focus("row", false); });
+    rt.frame(0.0);
+    assert_eq!(focused(&rt), "row");
+    rt.key(KeyEvent { key: Key::Tab, mods: Mods { shift: true, ..Default::default() } });
+    rt.frame(0.0);
+    assert_eq!(focused(&rt), "before", "Shift+Tab must step past the closed menu in one press");
+    assert!(!rt.state.open);
+}
