@@ -116,24 +116,33 @@ pub(crate) fn extend(origin: (usize, usize), at: (usize, usize)) -> (usize, usiz
 }
 
 /// Pushes the selection boxes of bytes `a..b` of `layout`, whose top-left draws at `origin`
-/// (device px) `k` times its size. Text fields and selectable text both draw through here, so
-/// their highlights match.
+/// (device px) `k` times its size. Text fields share `selection_box`, so both highlights match.
 #[allow(clippy::too_many_arguments)]
 pub(in crate::runtime) fn push_selection(out: &mut Vec<Instance>, flow: TextFlow<'_>, a: usize, b: usize, origin: [f32; 2], k: f32,
     fill: [f32; 4], s: f32, clip: [f32; 4], fade: [f32; 4]) {
     for (bb, _) in flow.range_boxes(a, b, true) {
-        let rect = super::text_marks::pixel_rect(origin, bb, k);
-        let radius = 2.0 * s * k;
-        extend_run(out, rect, fill, radius, clip, fade, 40.0 * s * k);
+        extend_run(out, super::text_marks::pixel_rect(origin, bb, k), fill, clip, fade, 40.0 * s * k);
     }
+}
+
+/// Marks a selection box in `uv.z`. A borderless `KIND_RECT` draws the same whatever `uv` holds,
+/// so this changes nothing on screen; `extend_run` uses it to tell the selection's own boxes from
+/// a mark's square background, which may carry the same fill and clip.
+const SELECTION_BOX: f32 = 1.0;
+
+/// A selection box: square, as AppKit and Chromium draw a text selection's highlight.
+fn selection_box(rect: [f32; 4], fill: [f32; 4], clip: [f32; 4], fade: [f32; 4]) -> Instance {
+    let mut i = rect_inst(rect, fill, 0.0, clip, fade);
+    i.uv[2] = SELECTION_BOX;
+    i
 }
 
 /// A text field's selection: one layout, so no runs to join, and a field's own fill behind it
 /// is the field, not a chip the highlight should stretch to.
 pub(in crate::runtime) fn push_field_selection(out: &mut Vec<Instance>, layout: TextFlow<'_>, a: usize, b: usize, origin: [f32; 2], k: f32,
-    fill: [f32; 4], s: f32, clip: [f32; 4], fade: [f32; 4]) {
+    fill: [f32; 4], clip: [f32; 4], fade: [f32; 4]) {
     for (bb, _) in layout.range_boxes(a, b, true) {
-        out.push(rect_inst(super::text_marks::pixel_rect(origin, bb, k), fill, 2.0 * s * k, clip, fade));
+        out.push(selection_box(super::text_marks::pixel_rect(origin, bb, k), fill, clip, fade));
     }
 }
 
@@ -141,13 +150,14 @@ pub(in crate::runtime) fn push_field_selection(out: &mut Vec<Instance>, layout: 
 /// one on the same line ended (or after the little gap a chip's icon and padding leave) joins
 /// it, so a run reads as one rect with no seams, as tall as the line's tallest text. When
 /// something filled was drawn in between (a chip's background), a rect of its own is drawn on
-/// top, reaching back to where the last one ended.
-fn extend_run(out: &mut Vec<Instance>, mut rect: [f32; 4], fill: [f32; 4], radius: f32, clip: [f32; 4], fade: [f32; 4], reach: f32) {
+/// top, reaching back to where the last one ended. Only selection boxes join: a mark's square
+/// background can share a selection's fill and clip and must keep its own extent.
+fn extend_run(out: &mut Vec<Instance>, mut rect: [f32; 4], fill: [f32; 4], clip: [f32; 4], fade: [f32; 4], reach: f32) {
     let from = out.len().saturating_sub(256);
     let found = out[from..].iter().rposition(|i| {
         let gap = rect[0] - (i.rect[0] + i.rect[2]);
         let overlap = (i.rect[1] + i.rect[3]).min(rect[1] + rect[3]) - i.rect[1].max(rect[1]);
-        i.fill == fill && i.clip == clip && i.radii == [radius; 4] && i.params[1] == crate::render::KIND_RECT
+        i.fill == fill && i.clip == clip && i.uv[2] == SELECTION_BOX && i.params[1] == crate::render::KIND_RECT
             && (-1.0..=reach).contains(&gap) && overlap > 0.6 * i.rect[3].min(rect[3])
     }).map(|k| from + k);
     let Some(at) = found else {
@@ -161,7 +171,7 @@ fn extend_run(out: &mut Vec<Instance>, mut rect: [f32; 4], fill: [f32; 4], radiu
             let (top, bottom) = (c[1].min(rect[1]), (c[1] + c[3]).max(rect[1] + rect[3]));
             rect = [c[0], top, rect[0] + rect[2] - c[0], bottom - top];
         }
-        return out.push(rect_inst(rect, fill, radius, clip, fade));
+        return out.push(selection_box(rect, fill, clip, fade));
     };
     let covered = out[at + 1..].iter().any(|i| i.params[1] == crate::render::KIND_RECT && i.fill != fill && i.fill[3] > 0.0);
     let prev = &mut out[at];
@@ -169,7 +179,7 @@ fn extend_run(out: &mut Vec<Instance>, mut rect: [f32; 4], fill: [f32; 4], radiu
     if covered {
         let left = (prev.rect[0] + prev.rect[2]).min(rect[0]);
         rect = [left, top, rect[0] + rect[2] - left, bottom - top];
-        return out.push(rect_inst(rect, fill, radius, clip, fade));
+        return out.push(selection_box(rect, fill, clip, fade));
     }
     prev.rect[2] = prev.rect[0].max(rect[0] + rect[2]) - prev.rect[0];
     prev.rect[1] = top;

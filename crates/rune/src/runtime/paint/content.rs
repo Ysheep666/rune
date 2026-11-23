@@ -383,7 +383,7 @@ impl RuntimeCore {
                         let (da, db) = e.display_selection_range(a, b);
                         let (highlight, ink) = inp.selection_style.map_or((inp.selection, None), |st| st.pick(self.host.window_focused != Some(false)));
                         selectable::push_field_selection(&mut self.instances, flow, da.max(shown_a), db.min(shown_b),
-                            origin, tk, premul(highlight, o, srgb), s, clip, fade);
+                            origin, tk, premul(highlight, o, srgb), clip, fade);
                         selected_ink = ink.map(|c| (da, db, premul(c, o, srgb)));
                     }
                     if e.focused {

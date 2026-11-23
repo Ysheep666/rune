@@ -1,0 +1,1 @@
+- Selectable text and text fields draw their selection highlight as square boxes, with no 2 pt rounded corners, as AppKit and Chromium do.

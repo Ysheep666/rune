@@ -214,6 +214,14 @@ fn the_highlight_matches_a_text_fields() {
     tick(&mut rt);
     let field = boxes(&rt, highlight());
     assert_eq!(field.len(), 1, "the field's selection box");
+    assert!(field.iter().all(|&(_, radius)| radius == 0.0), "square corners: {field:?}");
+
+    // A field keeps its selection painted after focus leaves; clear it so the word's box is
+    // measured alone.
+    rt.state.field.anchor = 0;
+    rt.state.field.focus = 0;
+    rt.invalidate();
+    tick(&mut rt);
 
     let g = glyphs(&rt, "cmd");
     click(&mut rt, g[1]);
